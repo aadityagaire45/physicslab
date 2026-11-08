@@ -57,12 +57,11 @@ export function DashboardPage() {
               </Badge>
             </div>
             <h2 className="mt-4 text-2xl font-semibold tracking-tight text-fg sm:text-3xl">
-              Explore. Experiment. Understand.
+              THE UNIVERSE, EXPLORED.
             </h2>
             <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-muted">
-              PHYSICSLAB is a virtual physics laboratory built for rigorous interactive experimentation. Control physical
-              variables in SI units, observe analytical and numerical simulations in real time, and verify results
-              against governing equations.
+              An interactive virtual physics laboratory where students can explore scientific concepts, conduct
+              experiments, visualize physical phenomena, and understand the laws governing our universe.
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-2.5">
               <ButtonLink

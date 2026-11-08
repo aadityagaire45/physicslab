@@ -92,7 +92,7 @@ export default function ExperimentPage() {
                   Interactive apparatus scheduled for Phase 2+
                 </h2>
                 <p className="mt-1 max-w-xl text-[13px] text-muted">
-                  PHYSICSLAB does not present placeholder controls as working simulations. Below are the learning
+                  PHYSQORA does not present placeholder controls as working simulations. Below are the learning
                   objectives and governing equations already implemented in the underlying physics engine.
                 </p>
               </div>

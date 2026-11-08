@@ -36,9 +36,9 @@ export default function AboutPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="About PHYSICSLAB"
-        title="A Modern Interactive Physics Laboratory"
-        description="PHYSICSLAB is an open-source scientific platform for performing virtual physics experiments, manipulating variables, observing real-time simulations and understanding physical laws visually."
+        eyebrow="About PHYSQORA"
+        title="THE UNIVERSE, EXPLORED."
+        description="An interactive virtual physics laboratory where students can explore scientific concepts, conduct experiments, visualize physical phenomena, and understand the laws governing our universe."
       />
 
       <div className="grid gap-4 sm:grid-cols-2">

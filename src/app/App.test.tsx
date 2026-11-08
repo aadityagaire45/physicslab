@@ -12,7 +12,7 @@ function renderAt(initialPath: string) {
 describe('application shell & pages', () => {
   it('renders the dashboard with branding, 8 categories and featured experiments', () => {
     renderAt('/');
-    expect(screen.getByRole('heading', { name: /Explore\. Experiment\. Understand\./i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /THE UNIVERSE, EXPLORED\./i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Laboratory Categories/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Featured Experiments/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Launch Projectile Motion Lab/i })).toBeInTheDocument();

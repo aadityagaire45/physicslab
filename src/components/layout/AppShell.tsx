@@ -43,7 +43,7 @@ export function AppShell() {
         </main>
         <footer className="border-t border-line px-4 py-4 text-[12px] text-subtle sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-2">
-            <span>PHYSICSLAB — Explore. Experiment. Understand.</span>
+            <span>PHYSQORA — THE UNIVERSE, EXPLORED.</span>
             <span>Runs entirely in your browser · No account required</span>
           </div>
         </footer>

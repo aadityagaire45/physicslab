@@ -36,7 +36,7 @@ const axisTick = { fill: 'var(--muted)', fontSize: 11 };
 const tickFormatter = (value: number) => formatNumber(value, 3);
 
 /**
- * Line chart with PHYSICSLAB styling. Animations are disabled: data updates
+ * Line chart with PHYSQORA styling. Animations are disabled: data updates
  * continuously as parameters change, and animating every update wastes CPU
  * on integrated graphics.
  */

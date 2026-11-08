@@ -13,7 +13,7 @@ function useSectionTitle(): string {
     return getExperiment(pathname.split('/')[2])?.title ?? 'Experiments';
   }
   const match = NAV_ITEMS.find((item) => (item.to === '/' ? pathname === '/' : pathname.startsWith(item.to)));
-  return match?.label ?? 'PHYSICSLAB';
+  return match?.label ?? 'PHYSQORA';
 }
 
 function GitHubIcon({ className }: { className?: string }) {
@@ -69,7 +69,7 @@ export function Header() {
           target="_blank"
           rel="noreferrer"
           className="hidden size-9 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg sm:flex"
-          aria-label="PHYSICSLAB on GitHub"
+          aria-label="PHYSQORA on GitHub"
           title="Source code on GitHub"
         >
           <GitHubIcon className="size-4.5" />

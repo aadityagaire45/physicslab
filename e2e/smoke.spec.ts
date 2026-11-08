@@ -8,7 +8,7 @@ test('navigates core sections and runs Projectile Motion without console errors'
   });
 
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /Explore\. Experiment\. Understand\./i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /THE UNIVERSE, EXPLORED\./i })).toBeVisible();
 
   await page.getByRole('link', { name: /Launch Projectile Motion Lab/i }).click();
   await expect(page.getByRole('heading', { name: 'Projectile Motion' })).toBeVisible();

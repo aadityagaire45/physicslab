@@ -9,7 +9,7 @@ export default function NotFoundPage() {
     <EmptyState
       icon={<Compass className="size-5" aria-hidden />}
       title="Page not found"
-      description="The page you requested does not exist in PHYSICSLAB."
+      description="The page you requested does not exist in PHYSQORA."
       action={
         <ButtonLink to="/" variant="primary" size="sm">
           Return to Dashboard

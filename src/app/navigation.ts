@@ -36,7 +36,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/notebook', label: 'My Notebook', icon: NotebookPen, description: 'Your lab notes and recorded results' },
       { to: '/learn', label: 'Learn', icon: GraduationCap, description: 'Core concepts and governing equations' },
-      { to: '/about', label: 'About', icon: Info, description: 'About PHYSICSLAB' },
+      { to: '/about', label: 'About', icon: Info, description: 'About PHYSQORA' },
     ],
   },
 ];

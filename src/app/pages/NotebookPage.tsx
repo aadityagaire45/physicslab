@@ -45,7 +45,7 @@ export default function NotebookPage() {
 
   const exportMarkdown = () => {
     const md = [
-      '# PHYSICSLAB Laboratory Notebook',
+      '# PHYSQORA Laboratory Notebook',
       '',
       ...entries.flatMap((entry) => {
         const exp = getExperiment(entry.experimentSlug);
@@ -65,7 +65,7 @@ export default function NotebookPage() {
         return lines;
       }),
     ].join('\n');
-    downloadTextFile('physicslab-notebook.md', md, 'text/markdown');
+    downloadTextFile('physqora-notebook.md', md, 'text/markdown');
   };
 
   return (

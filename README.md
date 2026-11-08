@@ -1,8 +1,8 @@
-# PHYSICSLAB
+# PHYSQORA
 
-**Explore. Experiment. Understand.**
+**THE UNIVERSE, EXPLORED.**
 
-PHYSICSLAB is an interactive physics laboratory for performing virtual experiments, manipulating physical variables in SI units, observing real-time simulations, plotting analytical models, and studying governing equations.
+An interactive virtual physics laboratory where students can explore scientific concepts, conduct experiments, visualize physical phenomena, and understand the laws governing our universe.
 
 ---
 

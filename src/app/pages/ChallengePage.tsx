@@ -53,7 +53,7 @@ export default function ChallengePage() {
       <PageHeader
         eyebrow="Challenge Mode"
         title="Quantitative Physics Drills"
-        description="Procedurally generated problems graded against the PHYSICSLAB physics engine within ±2 % relative tolerance."
+        description="Procedurally generated problems graded against the PHYSQORA physics engine within ±2 % relative tolerance."
         actions={
           <Button
             variant="primary"

@@ -70,7 +70,7 @@ export default function LearnPage() {
       <PageHeader
         eyebrow="Learn"
         title="Principles, Laws & Physical Constants"
-        description="Concise reference sheets for the equations used across PHYSICSLAB, with SI units, symbol definitions and validity assumptions."
+        description="Concise reference sheets for the equations used across PHYSQORA, with SI units, symbol definitions and validity assumptions."
       />
 
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter concepts by laboratory">

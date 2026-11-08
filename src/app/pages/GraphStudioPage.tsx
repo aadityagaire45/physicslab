@@ -48,7 +48,7 @@ export default function GraphStudioPage() {
     const columns = [model.xKey, ...result.series.map((s) => s.key)];
     const headers = [model.xLabel, ...result.series.map((s) => s.label)];
     const rows = result.data.map((row) => columns.map((col) => row[col] ?? ''));
-    downloadTextFile(`physicslab-${model.id}.csv`, toCsv(headers, rows), 'text/csv');
+    downloadTextFile(`physqora-${model.id}.csv`, toCsv(headers, rows), 'text/csv');
   };
 
   return (
@@ -56,7 +56,7 @@ export default function GraphStudioPage() {
       <PageHeader
         eyebrow="Graph Studio"
         title="Analytical Model Plotter"
-        description="Evaluate physical equations directly with the PHYSICSLAB calculation engine, inspect numerical tables and export CSV data."
+        description="Evaluate physical equations directly with the PHYSQORA calculation engine, inspect numerical tables and export CSV data."
         actions={
           <>
             <Button
