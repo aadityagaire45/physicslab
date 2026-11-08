@@ -16,8 +16,13 @@ import {
   dampedDisplacement,
   dampedEnvelope,
   dampingRegime,
+  measurePendulumPeriod,
   pendulumPeriodExact,
   pendulumPeriodSmallAngle,
+  pendulumStateAt,
+  pendulumSummary,
+  simulatePendulumTrajectory,
+  validatePendulumParams,
 } from '@/engine/physics/oscillations';
 import { carnotEfficiency, idealGasPressure } from '@/engine/physics/thermodynamics';
 import { stringHarmonicFrequency, travellingWave, waveSpeed } from '@/engine/physics/waves';
@@ -102,6 +107,106 @@ describe('physics engine — oscillations & integrators', () => {
       state = rk4Step((_t, [x, v]) => [v, -x], i * dt, state, dt);
     }
     expect(state[0]).toBeCloseTo(Math.cos(1), 6);
+  });
+
+  it('matches RK4 simulated pendulum period to small-angle and exact elliptic periods across amplitudes and masses', () => {
+    const smallAngleParams1 = {
+      length: 1.5,
+      mass: 0.5,
+      gravity: STANDARD_GRAVITY,
+      initialAngleDeg: 3,
+      damping: 0,
+    };
+    const smallAngleParams2 = { ...smallAngleParams1, mass: 8.0 };
+    const t0 = pendulumPeriodSmallAngle(1.5, STANDARD_GRAVITY);
+    const measuredSmall1 = measurePendulumPeriod(smallAngleParams1)!;
+    const measuredSmall2 = measurePendulumPeriod(smallAngleParams2)!;
+
+    expect(measuredSmall1).toBeCloseTo(t0, 3);
+    // Undamped period is independent of bob mass
+    expect(measuredSmall1).toBeCloseTo(measuredSmall2, 9);
+
+    // Large-angle nonlinear regime (90° and 150°)
+    const large90 = {
+      length: 1.2,
+      mass: 1.0,
+      gravity: STANDARD_GRAVITY,
+      initialAngleDeg: 90,
+      damping: 0,
+    };
+    const exact90 = pendulumPeriodExact(1.2, STANDARD_GRAVITY, degToRad(90));
+    const measured90 = measurePendulumPeriod(large90)!;
+    expect(measured90).toBeCloseTo(exact90, 3);
+    expect(measured90).toBeGreaterThan(pendulumPeriodSmallAngle(1.2, STANDARD_GRAVITY) * 1.15);
+
+    const large150 = { ...large90, initialAngleDeg: 150 };
+    const exact150 = pendulumPeriodExact(1.2, STANDARD_GRAVITY, degToRad(150));
+    const measured150 = measurePendulumPeriod(large150)!;
+    expect(measured150).toBeCloseTo(exact150, 2);
+  });
+
+  it('conserves mechanical energy when damping is zero and dissipates energy monotonically when damping is positive', () => {
+    const undampedParams = {
+      length: 1.6,
+      mass: 1.25,
+      gravity: STANDARD_GRAVITY,
+      initialAngleDeg: 110,
+      damping: 0,
+    };
+    const summaryUndamped = pendulumSummary(undampedParams);
+    const undampedStates = simulatePendulumTrajectory(undampedParams, 8, 201, 0.0015);
+
+    for (const s of undampedStates) {
+      expect(s.totalEnergy).toBeCloseTo(summaryUndamped.initialEnergy, 6);
+      expect(s.kineticEnergy).toBeGreaterThanOrEqual(0);
+      expect(s.potentialEnergy).toBeGreaterThanOrEqual(0);
+    }
+
+    // Interpolated state at an arbitrary intermediate time matches conserved energy
+    const midState = pendulumStateAt(undampedParams, undampedStates, 3.14159);
+    expect(midState.totalEnergy).toBeCloseTo(summaryUndamped.initialEnergy, 6);
+
+    // Damped pendulum loses mechanical energy monotonically
+    const dampedParams = { ...undampedParams, damping: 0.35 };
+    const dampedStates = simulatePendulumTrajectory(dampedParams, 8, 161, 0.002);
+    for (let i = 1; i < dampedStates.length; i += 1) {
+      expect(dampedStates[i].totalEnergy).toBeLessThanOrEqual(dampedStates[i - 1].totalEnergy + 1e-12);
+    }
+    expect(dampedStates[dampedStates.length - 1].totalEnergy).toBeLessThan(
+      dampedStates[0].totalEnergy * 0.25,
+    );
+  });
+
+  it('maintains numerical stability at high initial angles and rejects invalid pendulum parameters', () => {
+    const highAngleParams = {
+      length: 1.0,
+      mass: 1.0,
+      gravity: STANDARD_GRAVITY,
+      initialAngleDeg: 170,
+      damping: 0,
+    };
+    const states = simulatePendulumTrajectory(highAngleParams, 10, 201, 0.0015);
+    for (const s of states) {
+      expect(Number.isFinite(s.theta)).toBe(true);
+      expect(Number.isFinite(s.omega)).toBe(true);
+      expect(Math.abs(s.thetaDeg)).toBeLessThanOrEqual(170.01);
+    }
+
+    expect(() =>
+      validatePendulumParams({ length: 0, mass: 1, gravity: 9.8, initialAngleDeg: 30, damping: 0 }),
+    ).toThrow(RangeError);
+    expect(() =>
+      validatePendulumParams({ length: 1, mass: -1, gravity: 9.8, initialAngleDeg: 30, damping: 0 }),
+    ).toThrow(RangeError);
+    expect(() =>
+      validatePendulumParams({ length: 1, mass: 1, gravity: 0, initialAngleDeg: 30, damping: 0 }),
+    ).toThrow(RangeError);
+    expect(() =>
+      validatePendulumParams({ length: 1, mass: 1, gravity: 9.8, initialAngleDeg: 180, damping: 0 }),
+    ).toThrow(RangeError);
+    expect(() =>
+      validatePendulumParams({ length: 1, mass: 1, gravity: 9.8, initialAngleDeg: 30, damping: -0.1 }),
+    ).toThrow(RangeError);
   });
 });
 

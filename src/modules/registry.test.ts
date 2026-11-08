@@ -26,9 +26,10 @@ describe('experiment registry & search', () => {
   it('distinguishes available and planned experiments and filters accurately', () => {
     const available = queryExperiments({ status: 'available' });
     const planned = queryExperiments({ status: 'planned' });
-    expect(available.length).toBeGreaterThanOrEqual(1);
+    expect(available.map((e) => e.slug)).toEqual(['projectile-motion', 'simple-pendulum']);
     expect(available.length + planned.length).toBe(EXPERIMENTS.length);
     expect(getExperiment('projectile-motion')?.status).toBe('available');
+    expect(getExperiment('simple-pendulum')?.status).toBe('available');
     expect(queryExperiments({ text: 'snell optics' }).map((e) => e.slug)).toContain('refraction-snells-law');
   });
 

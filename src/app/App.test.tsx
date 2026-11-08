@@ -103,4 +103,21 @@ describe('application shell & pages', () => {
     expect(clearTimeoutSpy).toHaveBeenCalled();
     clearTimeoutSpy.mockRestore();
   });
+
+  it('renders the interactive Simple Pendulum Lab at /experiments/simple-pendulum and logs measurements to My Notebook', async () => {
+    renderAt('/experiments/simple-pendulum');
+    expect(await screen.findByText('Pendulum Apparatus', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByLabelText('Simple pendulum simulation canvas')).toBeInTheDocument();
+    expect(screen.getByText('Small-angle period T₀')).toBeInTheDocument();
+    expect(screen.getByText('Exact undamped period T')).toBeInTheDocument();
+    expect(screen.getByText('RK4 measured period T_sim')).toBeInTheDocument();
+
+    // Switch to the Large (150°) release angle preset and verify anharmonic period shift updates
+    fireEvent.click(screen.getByRole('button', { name: /150° \(Large\)/i }));
+    expect(screen.getByText(/\+76\.2% vs small-angle/i)).toBeInTheDocument();
+
+    // Record run in My Notebook
+    fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
+    expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
+  });
 });
