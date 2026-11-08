@@ -1,0 +1,217 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * PHYSICSLAB design tokens.
+ * Semantic colours are CSS variables so light/dark themes swap without
+ * duplicating utility classes. Tailwind utilities map onto these tokens:
+ *   bg-canvas, bg-surface, bg-surface-2, border-line, text-fg, text-muted …
+ */
+:root {
+  --canvas: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef1f6;
+  --surface-3: #e3e8f0;
+  --line: #dbe1ea;
+  --line-strong: #c4ccd8;
+  --fg: #0b1220;
+  --fg-soft: #2a3445;
+  --muted: #5d6879;
+  --subtle: #8a94a5;
+  --accent: #1f5fe0;
+  --accent-strong: #1a4fbf;
+  --accent-soft: rgb(31 95 224 / 0.1);
+  --cyan: #0e8ea8;
+  --success: #138a52;
+  --warning: #b26a00;
+  --danger: #c4314b;
+  --grid: rgb(15 23 42 / 0.06);
+  --shadow-color: 220 40% 20%;
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: #080c15;
+  --surface: #0d1320;
+  --surface-2: #121a2a;
+  --surface-3: #1a2437;
+  --line: #1c2638;
+  --line-strong: #2a3750;
+  --fg: #e6ebf3;
+  --fg-soft: #c3cbd8;
+  --muted: #8b97ab;
+  --subtle: #5f6b80;
+  --accent: #4b8bff;
+  --accent-strong: #6b9fff;
+  --accent-soft: rgb(75 139 255 / 0.12);
+  --cyan: #2dd4ee;
+  --success: #34c48a;
+  --warning: #f0a83a;
+  --danger: #f2667f;
+  --grid: rgb(148 163 184 / 0.07);
+  --shadow-color: 222 60% 2%;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-soft: var(--fg-soft);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-cyan: var(--cyan);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --shadow-panel: 0 1px 2px hsl(var(--shadow-color) / 0.06), 0 4px 16px -6px hsl(var(--shadow-color) / 0.12);
+  --shadow-pop: 0 2px 6px hsl(var(--shadow-color) / 0.1), 0 16px 40px -12px hsl(var(--shadow-color) / 0.35);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01', 'tnum' 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-canvas text-fg min-h-dvh;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 30%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+}
+
+@layer components {
+  /* Faint measurement grid used behind hero and simulation panels. */
+  .lab-grid {
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Per-category colour derived from the --cat variable set inline. */
+  .cat-text {
+    color: color-mix(in oklab, var(--cat) 72%, var(--fg));
+  }
+  .dark .cat-text {
+    color: color-mix(in oklab, var(--cat) 88%, white);
+  }
+  .cat-tile {
+    background: color-mix(in oklab, var(--cat) 12%, transparent);
+    color: color-mix(in oklab, var(--cat) 78%, var(--fg));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--cat) 22%, transparent);
+  }
+  .dark .cat-tile {
+    color: color-mix(in oklab, var(--cat) 90%, white);
+  }
+  .cat-strip {
+    background: var(--cat);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Range input styled consistently across Chrome, Edge and Firefox. */
+  .range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 1.25rem;
+    background: transparent;
+    cursor: pointer;
+  }
+  .range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(
+      to right,
+      var(--accent) 0 var(--fill, 50%),
+      var(--surface-3) var(--fill, 50%) 100%
+    );
+  }
+  .range::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--surface-3);
+  }
+  .range::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--accent);
+  }
+  .range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    margin-top: -6px;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 2px solid var(--accent);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  }
+  .range::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 2px solid var(--accent);
+  }
+  .range:focus-visible {
+    outline: none;
+  }
+  .range:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+}
+
+/* KaTeX inherits the surrounding text colour. */
+.katex {
+  font-size: 1.08em;
+  color: inherit;
+}
+.katex-display {
+  margin: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

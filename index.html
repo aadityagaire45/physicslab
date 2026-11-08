@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="PHYSICSLAB — an interactive physics laboratory. Explore. Experiment. Understand."
+    />
+    <meta name="theme-color" content="#0a0f1a" />
+    <title>PHYSICSLAB — Explore. Experiment. Understand.</title>
+    <script>
+      // Apply the stored theme before first paint to avoid a flash of the wrong theme.
+      (function () {
+        try {
+          var stored = JSON.parse(localStorage.getItem('physicslab:theme') || 'null');
+          var pref = (stored && stored.state && stored.state.theme) || 'system';
+          var dark =
+            pref === 'dark' ||
+            (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', dark);
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>PHYSICSLAB requires JavaScript to run interactive simulations.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
