@@ -32,6 +32,7 @@ describe('experiment registry & search', () => {
       'spring-mass-oscillator',
       'inclined-plane-friction',
       'collisions-momentum',
+      'orbital-motion',
     ]);
     expect(available.length + planned.length).toBe(EXPERIMENTS.length);
     expect(getExperiment('projectile-motion')?.status).toBe('available');
@@ -39,6 +40,7 @@ describe('experiment registry & search', () => {
     expect(getExperiment('spring-mass-oscillator')?.status).toBe('available');
     expect(getExperiment('inclined-plane-friction')?.status).toBe('available');
     expect(getExperiment('collisions-momentum')?.status).toBe('available');
+    expect(getExperiment('orbital-motion')?.status).toBe('available');
     expect(queryExperiments({ text: 'snell optics' }).map((e) => e.slug)).toContain('refraction-snells-law');
   });
 

@@ -42,9 +42,30 @@ import {
   validatePendulumParams,
   validateSpringMassParams,
 } from '@/engine/physics/oscillations';
+import {
+  EARTH_MASS,
+  circularOrbitalPeriod,
+  circularOrbitalVelocity,
+  classifyOrbit,
+  computeOrbitalElements,
+  escapeVelocity,
+  gravitationalAccelerationMagnitude,
+  gravitationalAccelerationVector,
+  gravitationalForceMagnitude,
+  gravitationalPotentialEnergy,
+  interpolateOrbitalStateAt,
+  orbitalEccentricity,
+  orbitalKineticEnergy,
+  simulateOrbitalTrajectory,
+  specificAngularMomentum,
+  specificOrbitalEnergy,
+  totalMechanicalEnergy,
+  validateOrbitalParams,
+  visVivaSpeed,
+} from '@/engine/physics/orbital';
 import { carnotEfficiency, idealGasPressure } from '@/engine/physics/thermodynamics';
 import { stringHarmonicFrequency, travellingWave, waveSpeed } from '@/engine/physics/waves';
-import { STANDARD_GRAVITY } from '@/engine/units/constants';
+import { GRAVITATIONAL_CONSTANT, STANDARD_GRAVITY } from '@/engine/units/constants';
 import { celsiusToKelvin, degToRad, radToDeg } from '@/engine/units/conversions';
 import { formatNumber, formatQuantity } from '@/engine/units/format';
 
@@ -630,5 +651,229 @@ describe('physics engine — electricity, magnetism, waves, optics, thermo, mode
     expect(formatQuantity(999.9, 'V', 3)).toBe('1.00 kV');
     expect(formatQuantity(-0.9999, 'A', 3)).toBe('−1.00 A');
     expect(formatNumber(999_999, 3)).toBe('1.00 × 10⁶');
+  });
+});
+
+describe('physics engine — orbital mechanics', () => {
+  const rLeo = 6.778e6; // 400 km altitude LEO
+
+  it('computes Newtonian gravitational force, acceleration vector, velocities, period, and vis-viva', () => {
+    const mSat = 1000;
+    const fg = gravitationalForceMagnitude(EARTH_MASS, mSat, rLeo);
+    const ag = gravitationalAccelerationMagnitude(EARTH_MASS, rLeo);
+    expect(fg).toBeCloseTo(mSat * ag, 6);
+    expect(ag).toBeCloseTo((GRAVITATIONAL_CONSTANT * EARTH_MASS) / (rLeo * rLeo), 9);
+
+    const vec = gravitationalAccelerationVector(rLeo, 0, EARTH_MASS);
+    expect(vec.ax).toBeCloseTo(-ag, 9);
+    expect(vec.ay).toBeCloseTo(0, 12);
+
+    const vc = circularOrbitalVelocity(EARTH_MASS, rLeo);
+    const ve = escapeVelocity(EARTH_MASS, rLeo);
+    expect(ve / vc).toBeCloseTo(Math.SQRT2, 12);
+
+    const period = circularOrbitalPeriod(EARTH_MASS, rLeo);
+    expect(period).toBeCloseTo((2 * Math.PI * rLeo) / vc, 6);
+
+    // Vis-viva for circular orbit (a = r) matches circular velocity
+    expect(visVivaSpeed(EARTH_MASS, rLeo, rLeo)).toBeCloseTo(vc, 9);
+  });
+
+  it('computes energies, specific angular momentum, and eccentricity accurately', () => {
+    const mSat = 1200;
+    const vc = circularOrbitalVelocity(EARTH_MASS, rLeo);
+    const K = orbitalKineticEnergy(mSat, vc);
+    const U = gravitationalPotentialEnergy(EARTH_MASS, mSat, rLeo);
+    const E = totalMechanicalEnergy(EARTH_MASS, mSat, rLeo, vc);
+    // Virial theorem for circular orbit: K = -U/2 and E = U/2 = -K
+    expect(K).toBeCloseTo(-0.5 * U, 4);
+    expect(E).toBeCloseTo(-K, 4);
+
+    const eps = specificOrbitalEnergy(EARTH_MASS, rLeo, vc);
+    expect(eps * mSat).toBeCloseTo(E, 4);
+
+    const h = specificAngularMomentum(rLeo, 0, 0, vc);
+    expect(h).toBeCloseTo(rLeo * vc, 6);
+
+    const eCirc = orbitalEccentricity(EARTH_MASS, eps, h);
+    expect(eCirc).toBeCloseTo(0, 6);
+  });
+
+  it('classifies circular, elliptical, parabolic, and hyperbolic orbits and handles undefined apsides/axes', () => {
+    const r0 = 8.0e6;
+    const vc = circularOrbitalVelocity(EARTH_MASS, r0);
+    const ve = escapeVelocity(EARTH_MASS, r0);
+
+    // 1. Circular orbit (v_t = v_c, v_r = 0)
+    const circ = computeOrbitalElements({
+      centralMass: EARTH_MASS,
+      satelliteMass: 1000,
+      initialRadius: r0,
+      tangentialVelocity: vc,
+      radialVelocity: 0,
+    });
+    expect(circ.classification).toBe('circular');
+    expect(circ.isBound).toBe(true);
+    expect(circ.eccentricity).toBeLessThan(1e-3);
+    expect(circ.semiMajorAxis).toBeCloseTo(r0, 1);
+    expect(circ.periapsisDistance).toBeCloseTo(r0, 1);
+    expect(circ.apoapsisDistance).toBeCloseTo(r0, 1);
+    expect(circ.orbitalPeriod).toBeCloseTo(circularOrbitalPeriod(EARTH_MASS, r0), 2);
+
+    // 2. Elliptical orbit (v_c < v_t < v_e)
+    const ellip = computeOrbitalElements({
+      centralMass: EARTH_MASS,
+      satelliteMass: 1000,
+      initialRadius: r0,
+      tangentialVelocity: 8200,
+      radialVelocity: 0,
+    });
+    expect(ellip.classification).toBe('elliptical');
+    expect(ellip.isBound).toBe(true);
+    expect(ellip.eccentricity).toBeGreaterThan(0.1);
+    expect(ellip.eccentricity).toBeLessThan(1);
+    expect(ellip.semiMajorAxis).not.toBeNull();
+    expect(ellip.periapsisDistance).toBeCloseTo(r0, 1);
+    expect(ellip.apoapsisDistance).toBeCloseTo(
+      ellip.semiMajorAxis! * (1 + ellip.eccentricity),
+      1,
+    );
+    // Vis-viva check at periapsis and apoapsis
+    expect(visVivaSpeed(EARTH_MASS, ellip.periapsisDistance, ellip.semiMajorAxis!)).toBeCloseTo(
+      ellip.periapsisSpeed,
+      6,
+    );
+    expect(visVivaSpeed(EARTH_MASS, ellip.apoapsisDistance!, ellip.semiMajorAxis!)).toBeCloseTo(
+      ellip.apoapsisSpeed!,
+      6,
+    );
+
+    // 3. Parabolic escape trajectory (v_t = v_e): semiMajorAxis, apoapsisDistance, orbitalPeriod must be null
+    const para = computeOrbitalElements({
+      centralMass: EARTH_MASS,
+      satelliteMass: 800,
+      initialRadius: r0,
+      tangentialVelocity: ve,
+      radialVelocity: 0,
+    });
+    expect(para.classification).toBe('parabolic');
+    expect(para.isBound).toBe(false);
+    expect(para.eccentricity).toBeCloseTo(1, 3);
+    expect(para.semiMajorAxis).toBeNull();
+    expect(para.apoapsisDistance).toBeNull();
+    expect(para.orbitalPeriod).toBeNull();
+    expect(para.periapsisDistance).toBeCloseTo(r0, 1);
+
+    // 4. Hyperbolic escape trajectory (v_t > v_e)
+    const hyp = computeOrbitalElements({
+      centralMass: EARTH_MASS,
+      satelliteMass: 800,
+      initialRadius: r0,
+      tangentialVelocity: 11500,
+      radialVelocity: 1000,
+    });
+    expect(hyp.classification).toBe('hyperbolic');
+    expect(hyp.isBound).toBe(false);
+    expect(hyp.eccentricity).toBeGreaterThan(1);
+    expect(hyp.semiMajorAxis).toBeLessThan(0);
+    expect(hyp.apoapsisDistance).toBeNull();
+    expect(hyp.orbitalPeriod).toBeNull();
+  });
+
+  it('integrates circular and elliptical orbits accurately with RK4 and conserves energy & angular momentum', () => {
+    const r0 = 1.0e7;
+    const vc = circularOrbitalVelocity(EARTH_MASS, r0);
+    const T = circularOrbitalPeriod(EARTH_MASS, r0);
+
+    // Full circular period integration returns satellite to (r0, 0)
+    const circParams = {
+      centralMass: EARTH_MASS,
+      satelliteMass: 1000,
+      initialRadius: r0,
+      tangentialVelocity: vc,
+      radialVelocity: 0,
+    };
+    const circTraj = simulateOrbitalTrajectory(circParams, {
+      duration: T,
+      sampleCount: 240,
+    });
+    const endState = circTraj.samples[circTraj.samples.length - 1];
+    expect(Math.abs(endState.x - r0) / r0).toBeLessThan(1e-4);
+    expect(Math.abs(endState.y) / r0).toBeLessThan(1e-4);
+    expect(circTraj.maxRelativeEnergyDrift).toBeLessThan(1e-5);
+    expect(circTraj.maxRelativeAngularMomentumDrift).toBeLessThan(1e-5);
+
+    // Half-period state on elliptical orbit reaches apoapsis r_a
+    const ellipParams = {
+      centralMass: EARTH_MASS,
+      satelliteMass: 1000,
+      initialRadius: 8.0e6,
+      tangentialVelocity: 8200,
+      radialVelocity: 0,
+    };
+    const ellipTraj = simulateOrbitalTrajectory(ellipParams, { sampleCount: 300 });
+    const halfPeriod = ellipTraj.elements.orbitalPeriod! * 0.5;
+    const apoState = interpolateOrbitalStateAt(ellipTraj, ellipParams, halfPeriod);
+    expect(Math.abs(apoState.r - ellipTraj.elements.apoapsisDistance!) / ellipTraj.elements.apoapsisDistance!).toBeLessThan(
+      1e-3,
+    );
+    expect(ellipTraj.maxRelativeEnergyDrift).toBeLessThan(1e-4);
+    expect(ellipTraj.maxRelativeAngularMomentumDrift).toBeLessThan(1e-4);
+  });
+
+  it('validates invalid parameters and remains numerically safe during close-approach or extreme inputs', () => {
+    expect(() =>
+      validateOrbitalParams({
+        centralMass: 0,
+        satelliteMass: 1000,
+        initialRadius: 1e7,
+        tangentialVelocity: 5000,
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      validateOrbitalParams({
+        centralMass: EARTH_MASS,
+        satelliteMass: -10,
+        initialRadius: 1e7,
+        tangentialVelocity: 5000,
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      validateOrbitalParams({
+        centralMass: EARTH_MASS,
+        satelliteMass: 1000,
+        initialRadius: 0,
+        tangentialVelocity: 5000,
+      }),
+    ).toThrow(RangeError);
+    expect(() => classifyOrbit(Number.NaN, 0.5)).toThrow(RangeError);
+
+    // Radial plunge (v_t = 0, v_r = -2000 m/s) close-approach safety: no NaN or Infinity
+    const plungeTraj = simulateOrbitalTrajectory(
+      {
+        centralMass: EARTH_MASS,
+        satelliteMass: 500,
+        initialRadius: 7.0e6,
+        tangentialVelocity: 0,
+        radialVelocity: -2000,
+      },
+      { duration: 4000, sampleCount: 120 },
+    );
+    for (const s of plungeTraj.samples) {
+      expect(Number.isFinite(s.x)).toBe(true);
+      expect(Number.isFinite(s.y)).toBe(true);
+      expect(Number.isFinite(s.speed)).toBe(true);
+      expect(Number.isFinite(s.totalEnergy)).toBe(true);
+    }
+
+    // Extreme super-massive central body & large distance
+    const extremeTraj = simulateOrbitalTrajectory({
+      centralMass: 1e26,
+      satelliteMass: 10000,
+      initialRadius: 5e8,
+      tangentialVelocity: circularOrbitalVelocity(1e26, 5e8),
+    });
+    expect(extremeTraj.elements.classification).toBe('circular');
+    expect(Number.isFinite(extremeTraj.samples[extremeTraj.samples.length - 1].r)).toBe(true);
   });
 });

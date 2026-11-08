@@ -199,4 +199,39 @@ describe('application shell & pages', () => {
     fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
     expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
   });
+
+  it('renders the interactive Orbital Motion Lab at /experiments/orbital-motion and verifies presets, classifications, graphs, and notebook logging', async () => {
+    renderAt('/experiments/orbital-motion');
+    expect(await screen.findByText('2D Newtonian Orbital Apparatus', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByLabelText('Two-dimensional orbital mechanics simulation canvas')).toBeInTheDocument();
+    expect(screen.getByText('Periapsis distance r_p')).toBeInTheDocument();
+    expect(screen.getByText('Apoapsis distance r_a')).toBeInTheDocument();
+
+    // Switch to Low Earth Orbit preset (Circular)
+    fireEvent.click(screen.getByRole('button', { name: /Low Earth Orbit/i }));
+    expect(screen.getByText('Circular Orbit (e = 0)')).toBeInTheDocument();
+
+    // Switch to Escape Trajectory preset (Parabolic)
+    fireEvent.click(screen.getByRole('button', { name: /Escape Trajectory/i }));
+    expect(screen.getByText('Parabolic Escape Trajectory (e = 1.00)')).toBeInTheDocument();
+    expect(screen.getByText('Divergent (e = 1)')).toBeInTheDocument();
+    expect(screen.getByText('Unbound (∞)')).toBeInTheDocument();
+
+    // Switch to Hyperbolic Flyby preset
+    fireEvent.click(screen.getByRole('button', { name: /Hyperbolic Flyby/i }));
+    expect(screen.getByText(/Hyperbolic Escape Trajectory/i)).toBeInTheDocument();
+
+    // Step forward and cycle through all 6 graph tabs
+    fireEvent.click(screen.getByRole('button', { name: /^Step$/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /v\(t\) Orbital Speed/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /K\(t\) Kinetic Energy/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /U\(t\) Potential Energy/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /E\(t\) Total Energy/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /L\(t\) Angular Momentum/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /r\(t\) Orbital Radius/i }));
+
+    // Record run in My Notebook
+    fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
+    expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
+  });
 });

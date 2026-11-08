@@ -1,6 +1,7 @@
 export * from './kinematics';
 export * from './oscillations';
 export * from './mechanics';
+export * from './orbital';
 export * from './electricity';
 export * from './magnetism';
 export * from './waves';
