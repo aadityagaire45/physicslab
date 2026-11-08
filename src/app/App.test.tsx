@@ -120,4 +120,83 @@ describe('application shell & pages', () => {
     fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
     expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
   });
+
+  it('renders the interactive Spring–Mass Oscillator Lab at /experiments/spring-mass-oscillator and switches regimes and graphs', async () => {
+    renderAt('/experiments/spring-mass-oscillator');
+    expect(await screen.findByText('Vertical Spring–Mass Apparatus', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByLabelText('Vertical spring-mass oscillator simulation canvas')).toBeInTheDocument();
+    expect(screen.getByText('Angular frequency ω₀')).toBeInTheDocument();
+    expect(screen.getByText('Damping ratio ζ')).toBeInTheDocument();
+
+    // Switch to Critical damping preset (ζ = 1) and verify damped frequency becomes Non-oscillatory
+    fireEvent.click(screen.getByRole('button', { name: /Critical damping/i }));
+    expect(screen.getByText('Non-oscillatory')).toBeInTheDocument();
+
+    // Step simulation forward and switch kinematic & energy graph tabs
+    fireEvent.click(screen.getByRole('button', { name: /^Step$/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /v\(t\) Velocity/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /a\(t\) Acceleration/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /K\(t\) Kinetic/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /U\(t\) Potential/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /E\(t\) Total Mechanical/i }));
+
+    // Record run in My Notebook
+    fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
+    expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
+  });
+
+  it('renders the interactive Inclined Plane Lab at /experiments/inclined-plane-friction and switches presets and graphs', async () => {
+    renderAt('/experiments/inclined-plane-friction');
+    expect(await screen.findByText('Inclined Plane & Free-Body Apparatus', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByLabelText('Inclined plane and friction simulation canvas')).toBeInTheDocument();
+    expect(screen.getByText('Normal force N')).toBeInTheDocument();
+    expect(screen.getByText('Critical angle θ_c')).toBeInTheDocument();
+
+    // Switch to Rough plane preset (stationary)
+    fireEvent.click(screen.getByRole('button', { name: /Rough plane/i }));
+    expect(screen.getByText(/Stationary \(Static Equilibrium\)/i)).toBeInTheDocument();
+
+    // Switch to Just at limiting equilibrium preset
+    fireEvent.click(screen.getByRole('button', { name: /Just at limiting equilibrium/i }));
+    expect(screen.getByText('Limiting Equilibrium (f_s = f_s,max)')).toBeInTheDocument();
+
+    // Switch to Sliding block preset
+    fireEvent.click(screen.getByRole('button', { name: /Sliding block/i }));
+    expect(screen.getByText(/Sliding Downslope/i)).toBeInTheDocument();
+
+    // Switch analysis tabs
+    fireEvent.click(screen.getByRole('radio', { name: /Static vs Kinetic/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /Energy & Thermal Dissipation/i }));
+
+    // Record run in My Notebook
+    fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
+    expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
+  });
+
+  it('renders the interactive Collisions & Momentum Lab at /experiments/collisions-momentum and verifies presets and graphs', async () => {
+    renderAt('/experiments/collisions-momentum');
+    expect(await screen.findByText('1D Horizontal Collision Track', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByLabelText('One-dimensional collision track simulation canvas')).toBeInTheDocument();
+    expect(screen.getByText('Initial momentum Pᵢ')).toBeInTheDocument();
+    expect(screen.getByText('Final momentum P_f')).toBeInTheDocument();
+    expect(screen.getByText('Energy lost ΔK_lost')).toBeInTheDocument();
+
+    // Switch to Perfectly Inelastic preset and verify badge updates
+    fireEvent.click(screen.getByRole('button', { name: /Equal masses, perfectly inelastic collision/i }));
+    expect(screen.getByText('Perfectly Inelastic (e = 0, Coupled)')).toBeInTheDocument();
+
+    // Switch to Two objects moving toward each other preset
+    fireEvent.click(screen.getByRole('button', { name: /Two objects moving toward each other/i }));
+    expect(screen.getByText('Partially Inelastic (e = 0.80)')).toBeInTheDocument();
+
+    // Step forward and cycle through graph tabs
+    fireEvent.click(screen.getByRole('button', { name: /^Step$/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /x\(t\) Position/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /p\(t\) Momentum/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /K\(t\) Kinetic Energy/i }));
+
+    // Record run in My Notebook
+    fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
+    expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
+  });
 });

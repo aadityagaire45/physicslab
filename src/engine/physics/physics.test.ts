@@ -9,6 +9,16 @@ import {
 } from '@/engine/physics/electricity';
 import { voltageDividerOutput } from '@/engine/physics/electronics';
 import { levelGroundRange, projectileStateAt, projectileSummary, timeOfFlight } from '@/engine/physics/kinematics';
+import {
+  classifyCollision,
+  collisionTrackStateAt,
+  criticalInclineAngleDeg,
+  inclinedPlaneStateAt,
+  inclinedPlaneSummary,
+  solveOneDimensionalCollision,
+  validateCollisionParams,
+  validateInclinedPlaneParams,
+} from '@/engine/physics/mechanics';
 import { cyclotronRadius, straightWireField } from '@/engine/physics/magnetism';
 import { photoelectricMaxKineticEnergyEv, remainingNuclei } from '@/engine/physics/modern';
 import { criticalAngle, refractionAngle, thinLensImageDistance } from '@/engine/physics/optics';
@@ -16,13 +26,21 @@ import {
   dampedDisplacement,
   dampedEnvelope,
   dampingRegime,
+  hookesLawForce,
   measurePendulumPeriod,
   pendulumPeriodExact,
   pendulumPeriodSmallAngle,
   pendulumStateAt,
   pendulumSummary,
   simulatePendulumTrajectory,
+  simulateSpringMassTrajectory,
+  springAngularFrequency,
+  springFrequency,
+  springMassStateAt,
+  springMassSummary,
+  springPeriod,
   validatePendulumParams,
+  validateSpringMassParams,
 } from '@/engine/physics/oscillations';
 import { carnotEfficiency, idealGasPressure } from '@/engine/physics/thermodynamics';
 import { stringHarmonicFrequency, travellingWave, waveSpeed } from '@/engine/physics/waves';
@@ -53,6 +71,254 @@ describe('physics engine — kinematics', () => {
     expect(() => levelGroundRange(-5, 45, STANDARD_GRAVITY)).toThrow(RangeError);
     expect(() => levelGroundRange(10, 120, STANDARD_GRAVITY)).toThrow(RangeError);
     expect(() => levelGroundRange(10, 45, 0)).toThrow(RangeError);
+  });
+
+  it('resolves inclined plane forces, static threshold, critical angle, and stationary vs sliding states', () => {
+    const stationaryParams = {
+      mass: 4.0,
+      angleDeg: 20,
+      staticFriction: 0.5,
+      kineticFriction: 0.35,
+      gravity: 10.0,
+      initialVelocity: 0,
+    };
+    const st0 = inclinedPlaneStateAt(stationaryParams, 2.0);
+    const theta20 = degToRad(20);
+    expect(st0.weight).toBeCloseTo(40, 12);
+    expect(st0.normalForce).toBeCloseTo(40 * Math.cos(theta20), 12);
+    expect(st0.gravityParallel).toBeCloseTo(40 * Math.sin(theta20), 12);
+    expect(st0.maxStaticFriction).toBeCloseTo(0.5 * 40 * Math.cos(theta20), 12);
+    expect(st0.kineticFrictionForce).toBeCloseTo(0.35 * 40 * Math.cos(theta20), 12);
+
+    // Since tan(20°) ≈ 0.364 ≤ μ_s = 0.5, the block remains stationary and uses static friction (not kinetic)
+    expect(st0.motionRegime).toBe('stationary');
+    expect(st0.s).toBe(0);
+    expect(st0.v).toBe(0);
+    expect(st0.a).toBe(0);
+    expect(st0.frictionMode).toBe('static');
+    expect(st0.frictionDirection).toBe('uphill');
+    expect(st0.frictionMagnitude).toBeCloseTo(st0.gravityParallel, 12);
+    expect(st0.netForce).toBe(0);
+
+    // Critical angle θ_c = arctan(μ_s)
+    const thetaC = criticalInclineAngleDeg(0.5);
+    expect(thetaC).toBeCloseTo(radToDeg(Math.atan(0.5)), 12);
+    const limiting = inclinedPlaneStateAt({ ...stationaryParams, angleDeg: thetaC }, 0);
+    expect(limiting.motionRegime).toBe('limiting-equilibrium');
+    expect(limiting.a).toBe(0);
+
+    // Downward sliding when θ > θ_c
+    const slidingParams = { ...stationaryParams, angleDeg: 35 };
+    const theta35 = degToRad(35);
+    const expectedADown = 10.0 * (Math.sin(theta35) - 0.35 * Math.cos(theta35));
+    const stSlide = inclinedPlaneStateAt(slidingParams, 2.0);
+    expect(stSlide.motionRegime).toBe('sliding-down');
+    expect(stSlide.frictionMode).toBe('kinetic');
+    expect(stSlide.frictionDirection).toBe('uphill');
+    expect(stSlide.frictionMagnitude).toBeCloseTo(stSlide.kineticFrictionForce, 12);
+    expect(stSlide.a).toBeCloseTo(expectedADown, 12);
+    expect(stSlide.v).toBeCloseTo(expectedADown * 2.0, 12);
+    expect(stSlide.s).toBeCloseTo(0.5 * expectedADown * 4.0, 12);
+    // Work-energy balance: -ΔU = K + E_thermal
+    expect(-stSlide.potentialEnergyChange).toBeCloseTo(stSlide.kineticEnergy + stSlide.thermalEnergy, 9);
+  });
+
+  it('handles upward sliding friction direction, turnaround sticking/reversal, zero-angle, and invalid inputs', () => {
+    // Upward launch (v₀ < 0) on a gentle rough slope (θ = 15°, μ_s = 0.6, μ_k = 0.4) -> sticks at turnaround
+    const uphillStickParams = {
+      mass: 2.0,
+      angleDeg: 15,
+      staticFriction: 0.6,
+      kineticFriction: 0.4,
+      gravity: 10.0,
+      initialVelocity: -4.0,
+    };
+    const theta15 = degToRad(15);
+    const expectedAUp = 10.0 * (Math.sin(theta15) + 0.4 * Math.cos(theta15));
+    const stUp = inclinedPlaneStateAt(uphillStickParams, 0.2);
+    expect(stUp.motionRegime).toBe('sliding-up');
+    expect(stUp.frictionMode).toBe('kinetic');
+    // During upward sliding, kinetic friction points downhill (+s)
+    expect(stUp.frictionDirection).toBe('downhill');
+    expect(stUp.a).toBeCloseTo(expectedAUp, 12);
+
+    const summaryStick = inclinedPlaneSummary(uphillStickParams);
+    expect(summaryStick.transitionTime).toBeCloseTo(4.0 / expectedAUp, 12);
+    const stAfterTurn = inclinedPlaneStateAt(uphillStickParams, summaryStick.transitionTime! + 1.0);
+    expect(stAfterTurn.motionRegime).toBe('stationary');
+    expect(stAfterTurn.v).toBe(0);
+    expect(stAfterTurn.a).toBe(0);
+    expect(stAfterTurn.frictionMode).toBe('static');
+    expect(stAfterTurn.frictionDirection).toBe('uphill');
+
+    // Upward launch on a steep slope (θ = 40°, μ_s = 0.3, μ_k = 0.2) -> reverses at turnaround and slides downhill
+    const uphillReverseParams = {
+      mass: 2.0,
+      angleDeg: 40,
+      staticFriction: 0.3,
+      kineticFriction: 0.2,
+      gravity: 10.0,
+      initialVelocity: -3.0,
+    };
+    const summaryRev = inclinedPlaneSummary(uphillReverseParams);
+    const stAfterRev = inclinedPlaneStateAt(uphillReverseParams, summaryRev.transitionTime! + 0.8);
+    expect(stAfterRev.motionRegime).toBe('sliding-down');
+    expect(stAfterRev.v).toBeGreaterThan(0);
+    expect(stAfterRev.frictionDirection).toBe('uphill');
+
+    // Zero-angle horizontal surface at rest
+    const horiz = inclinedPlaneStateAt(
+      { mass: 5, angleDeg: 0, staticFriction: 0.4, kineticFriction: 0.3, gravity: 9.81, initialVelocity: 0 },
+      1.0,
+    );
+    expect(horiz.normalForce).toBeCloseTo(5 * 9.81, 12);
+    expect(horiz.gravityParallel).toBe(0);
+    expect(horiz.frictionMagnitude).toBe(0);
+    expect(horiz.frictionMode).toBe('none');
+
+    // Parameter validation
+    expect(() =>
+      validateInclinedPlaneParams({
+        mass: 0,
+        angleDeg: 20,
+        staticFriction: 0.4,
+        kineticFriction: 0.3,
+        gravity: 9.81,
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      validateInclinedPlaneParams({
+        mass: 2,
+        angleDeg: 70,
+        staticFriction: 0.4,
+        kineticFriction: 0.3,
+        gravity: 9.81,
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      validateInclinedPlaneParams({
+        mass: 2,
+        angleDeg: 20,
+        staticFriction: 0.2,
+        kineticFriction: 0.4, // μ_k > μ_s invalid
+        gravity: 9.81,
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it('solves 1D elastic, partially inelastic, and perfectly inelastic collisions while strictly conserving momentum', () => {
+    // 1. Equal masses, elastic collision with stationary target -> complete velocity transfer
+    const equalElastic = solveOneDimensionalCollision({
+      m1: 2.0,
+      m2: 2.0,
+      u1: 4.0,
+      u2: 0.0,
+      restitution: 1.0,
+    });
+    expect(equalElastic.classification).toBe('perfectly-elastic');
+    expect(equalElastic.willCollide).toBe(true);
+    expect(equalElastic.v1).toBeCloseTo(0, 12);
+    expect(equalElastic.v2).toBeCloseTo(4.0, 12);
+    expect(equalElastic.initialMomentum).toBeCloseTo(equalElastic.finalMomentum, 12);
+    expect(equalElastic.momentumDifference).toBe(0);
+    expect(equalElastic.initialKineticEnergy).toBeCloseTo(equalElastic.finalKineticEnergy, 12);
+    expect(equalElastic.kineticEnergyLost).toBe(0);
+    expect(equalElastic.realizedRestitution).toBeCloseTo(1.0, 12);
+
+    // 2. Equal masses, perfectly inelastic collision -> objects couple at v_cm = u1 / 2 and lose 50% of K_i
+    const equalInelastic = solveOneDimensionalCollision({
+      m1: 3.0,
+      m2: 3.0,
+      u1: 4.0,
+      u2: 0.0,
+      restitution: 0.0,
+    });
+    expect(equalInelastic.classification).toBe('perfectly-inelastic');
+    expect(equalInelastic.v1).toBeCloseTo(2.0, 12);
+    expect(equalInelastic.v2).toBeCloseTo(2.0, 12);
+    expect(equalInelastic.initialMomentum).toBeCloseTo(equalInelastic.finalMomentum, 12);
+    expect(equalInelastic.kineticEnergyLost).toBeCloseTo(equalInelastic.initialKineticEnergy * 0.5, 12);
+    expect(equalInelastic.realizedRestitution).toBe(0);
+
+    // Verify both objects move together at identical positions after t_c in perfectly inelastic collision
+    const postState = collisionTrackStateAt(
+      { m1: 3.0, m2: 3.0, u1: 4.0, u2: 0.0, restitution: 0.0, initialSeparation: 4.0 },
+      equalInelastic.collisionTime! + 1.5,
+    );
+    expect(postState.phase).toBe('post-collision');
+    expect(postState.x1).toBeCloseTo(postState.x2, 12);
+    expect(postState.v1).toBeCloseTo(postState.v2, 12);
+
+    // 3. Partially inelastic head-on collision (opposite-direction motion, unequal masses)
+    const headOn = solveOneDimensionalCollision({
+      m1: 2.0,
+      m2: 3.0,
+      u1: 3.5,
+      u2: -2.5,
+      restitution: 0.6,
+    });
+    expect(headOn.classification).toBe('partially-inelastic');
+    expect(headOn.initialMomentum).toBeCloseTo(headOn.finalMomentum, 12);
+    expect(headOn.realizedRestitution).toBeCloseTo(0.6, 12);
+    const expectedKLost = 0.5 * ((2 * 3) / 5) * (1 - 0.36) * Math.pow(3.5 - -2.5, 2);
+    expect(headOn.kineticEnergyLost).toBeCloseTo(expectedKLost, 12);
+    expect(headOn.finalKineticEnergy).toBeLessThan(headOn.initialKineticEnergy);
+  });
+
+  it('handles heavy/light mass ratios, equal velocities, non-colliding trajectories, and invalid collision inputs', () => {
+    // Heavy hitting stationary light (m1 >> m2): both move forward, v2 > u1
+    const heavyLight = solveOneDimensionalCollision({
+      m1: 10.0,
+      m2: 1.0,
+      u1: 3.0,
+      u2: 0.0,
+      restitution: 1.0,
+    });
+    expect(heavyLight.v1).toBeGreaterThan(0);
+    expect(heavyLight.v2).toBeGreaterThan(3.0);
+    expect(heavyLight.initialMomentum).toBeCloseTo(heavyLight.finalMomentum, 12);
+
+    // Light hitting stationary heavy (m1 << m2): object 1 rebounds (v1 < 0)
+    const lightHeavy = solveOneDimensionalCollision({
+      m1: 1.0,
+      m2: 10.0,
+      u1: 3.0,
+      u2: 0.0,
+      restitution: 1.0,
+    });
+    expect(lightHeavy.v1).toBeLessThan(0);
+    expect(lightHeavy.v2).toBeGreaterThan(0);
+    expect(lightHeavy.initialMomentum).toBeCloseTo(lightHeavy.finalMomentum, 12);
+
+    // Equal initial velocities (u1 = u2): safe handling with no division by zero
+    const equalVel = solveOneDimensionalCollision({
+      m1: 2.0,
+      m2: 4.0,
+      u1: 2.5,
+      u2: 2.5,
+      restitution: 0.8,
+    });
+    expect(equalVel.willCollide).toBe(false);
+    expect(equalVel.collisionTime).toBeNull();
+    expect(equalVel.realizedRestitution).toBeNull();
+    expect(equalVel.v1).toBeCloseTo(2.5, 12);
+    expect(equalVel.v2).toBeCloseTo(2.5, 12);
+    expect(equalVel.kineticEnergyLost).toBe(0);
+
+    // Invalid inputs
+    expect(() => classifyCollision(-0.1)).toThrow(RangeError);
+    expect(() =>
+      validateCollisionParams({ m1: 0, m2: 2, u1: 1, u2: 0, restitution: 1 }),
+    ).toThrow(RangeError);
+    expect(() =>
+      validateCollisionParams({ m1: 2, m2: -1, u1: 1, u2: 0, restitution: 1 }),
+    ).toThrow(RangeError);
+    expect(() =>
+      validateCollisionParams({ m1: 2, m2: 2, u1: 1, u2: 0, restitution: -0.2 }),
+    ).toThrow(RangeError);
+    expect(() =>
+      validateCollisionParams({ m1: 2, m2: 2, u1: 1, u2: 0, restitution: 2.0 }),
+    ).toThrow(RangeError);
   });
 });
 
@@ -206,6 +472,114 @@ describe('physics engine — oscillations & integrators', () => {
     ).toThrow(RangeError);
     expect(() =>
       validatePendulumParams({ length: 1, mass: 1, gravity: 9.8, initialAngleDeg: 30, damping: -0.1 }),
+    ).toThrow(RangeError);
+  });
+
+  it('evaluates Hooke’s law, natural angular frequency, period, frequency, and damped frequency for spring–mass systems', () => {
+    expect(hookesLawForce(25, 0.4)).toBeCloseTo(-10, 12);
+    expect(hookesLawForce(25, -0.4)).toBeCloseTo(10, 12);
+    expect(hookesLawForce(25, 0)).toBe(0);
+
+    const m = 2.0;
+    const k = 32.0;
+    const omega0 = springAngularFrequency(m, k);
+    const period = springPeriod(m, k);
+    const freq = springFrequency(m, k);
+    expect(omega0).toBeCloseTo(4.0, 12);
+    expect(period).toBeCloseTo((2 * Math.PI) / 4.0, 12);
+    expect(freq).toBeCloseTo(4.0 / (2 * Math.PI), 12);
+
+    const underSummary = springMassSummary({
+      mass: m,
+      springConstant: k,
+      initialDisplacement: 0.5,
+      initialVelocity: 0,
+      damping: 4.0, // gamma = 1.0 < omega0 = 4.0
+    });
+    expect(underSummary.regime).toBe('underdamped');
+    expect(underSummary.dampedAngularFrequency).toBeCloseTo(Math.sqrt(15), 12);
+    expect(underSummary.dampingRatio).toBeCloseTo(0.25, 12);
+
+    const critSummary = springMassSummary({
+      mass: m,
+      springConstant: k,
+      initialDisplacement: 0.5,
+      initialVelocity: 0,
+      damping: 16.0, // b_c = 2 * sqrt(64) = 16
+    });
+    expect(critSummary.regime).toBe('critically-damped');
+    expect(critSummary.dampedAngularFrequency).toBeNull();
+    expect(critSummary.dampingRatio).toBeCloseTo(1.0, 12);
+
+    const overSummary = springMassSummary({
+      mass: m,
+      springConstant: k,
+      initialDisplacement: 0.5,
+      initialVelocity: 0,
+      damping: 24.0,
+    });
+    expect(overSummary.regime).toBe('overdamped');
+    expect(overSummary.dampedAngularFrequency).toBeNull();
+  });
+
+  it('matches RK4 spring–mass integration to exact analytical solutions across all regimes and conserves/dissipates energy accurately', () => {
+    const regimes: Array<{ damping: number; label: string }> = [
+      { damping: 0, label: 'undamped' },
+      { damping: 1.2, label: 'underdamped' },
+      { damping: 8.0, label: 'critically-damped' },
+      { damping: 14.0, label: 'overdamped' },
+    ];
+
+    for (const r of regimes) {
+      const params = {
+        mass: 1.0,
+        springConstant: 16.0,
+        initialDisplacement: 0.6,
+        initialVelocity: -1.2,
+        damping: r.damping,
+      };
+      const states = simulateSpringMassTrajectory(params, 5, 201, 0.0015);
+      for (const s of states) {
+        expect(s.x).toBeCloseTo(s.xAnalytical, 6);
+        expect(s.v).toBeCloseTo(s.vAnalytical, 5);
+        expect(s.a).toBeCloseTo(s.aAnalytical, 4);
+      }
+
+      if (r.damping === 0) {
+        const e0 = states[0].totalEnergy;
+        for (const s of states) {
+          expect(s.totalEnergy).toBeCloseTo(e0, 6);
+        }
+        const mid = springMassStateAt(params, states, 2.345);
+        expect(mid.totalEnergy).toBeCloseTo(e0, 6);
+      } else {
+        for (let i = 1; i < states.length; i += 1) {
+          expect(states[i].totalEnergy).toBeLessThanOrEqual(states[i - 1].totalEnergy + 1e-12);
+        }
+        expect(states[states.length - 1].totalEnergy).toBeLessThan(states[0].totalEnergy * 0.15);
+      }
+    }
+
+    expect(() => hookesLawForce(0, 0.5)).toThrow(RangeError);
+    expect(() => springAngularFrequency(-1, 10)).toThrow(RangeError);
+    expect(() => springPeriod(1, 0)).toThrow(RangeError);
+    expect(() =>
+      validateSpringMassParams({
+        mass: 0,
+        springConstant: 10,
+        initialDisplacement: 0.2,
+        initialVelocity: 0,
+        damping: 0,
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      validateSpringMassParams({
+        mass: 1,
+        springConstant: 10,
+        initialDisplacement: 0.2,
+        initialVelocity: 0,
+        damping: -0.5,
+      }),
     ).toThrow(RangeError);
   });
 });

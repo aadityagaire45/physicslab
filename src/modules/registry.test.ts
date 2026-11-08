@@ -26,10 +26,19 @@ describe('experiment registry & search', () => {
   it('distinguishes available and planned experiments and filters accurately', () => {
     const available = queryExperiments({ status: 'available' });
     const planned = queryExperiments({ status: 'planned' });
-    expect(available.map((e) => e.slug)).toEqual(['projectile-motion', 'simple-pendulum']);
+    expect(available.map((e) => e.slug)).toEqual([
+      'projectile-motion',
+      'simple-pendulum',
+      'spring-mass-oscillator',
+      'inclined-plane-friction',
+      'collisions-momentum',
+    ]);
     expect(available.length + planned.length).toBe(EXPERIMENTS.length);
     expect(getExperiment('projectile-motion')?.status).toBe('available');
     expect(getExperiment('simple-pendulum')?.status).toBe('available');
+    expect(getExperiment('spring-mass-oscillator')?.status).toBe('available');
+    expect(getExperiment('inclined-plane-friction')?.status).toBe('available');
+    expect(getExperiment('collisions-momentum')?.status).toBe('available');
     expect(queryExperiments({ text: 'snell optics' }).map((e) => e.slug)).toContain('refraction-snells-law');
   });
 
