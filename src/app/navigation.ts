@@ -43,4 +43,4 @@ export const NAV_GROUPS: NavGroup[] = [
 
 export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
-export const REPOSITORY_URL = 'https://github.com/aadityagaire45/physicslab';
+export const REPOSITORY_URL = 'https://github.com/aadityagaire45/PHYSQORA';

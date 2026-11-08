@@ -106,7 +106,7 @@ export default function AboutPage() {
               <dt className="text-muted">Source repository</dt>
               <dd>
                 <a href={REPOSITORY_URL} target="_blank" rel="noreferrer" className="font-medium text-accent hover:underline">
-                  github.com/aadityagaire45/physicslab
+                  github.com/aadityagaire45/PHYSQORA
                 </a>
               </dd>
             </div>

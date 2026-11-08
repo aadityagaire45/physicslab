@@ -4,6 +4,10 @@
 
 An interactive virtual physics laboratory where students can explore scientific concepts, conduct experiments, visualize physical phenomena, and understand the laws governing our universe.
 
+Live Application: [https://physqora.vercel.app/](https://physqora.vercel.app/)
+<br>
+GitHub Repository: [https://github.com/aadityagaire45/PHYSQORA](https://github.com/aadityagaire45/PHYSQORA)
+
 ---
 
 ## Features (Phase 1 Foundation)
@@ -71,6 +75,8 @@ src/
 ### Installation
 
 ```bash
+git clone https://github.com/aadityagaire45/PHYSQORA.git
+cd PHYSQORA
 npm install
 ```
 
