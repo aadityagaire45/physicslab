@@ -234,4 +234,96 @@ describe('application shell & pages', () => {
     fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
     expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
   });
+
+  it('renders the interactive Ohm’s Law Lab at /experiments/ohms-law and logs measurements to My Notebook', async () => {
+    renderAt('/experiments/ohms-law');
+    expect(await screen.findByText('Interactive DC Ohm’s Law Circuit', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/Interactive Ohm's law DC circuit diagram with battery, switch, ammeter, load resistor and voltmeter/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Switch S₁ Closed (Conducting)')).toBeInTheDocument();
+
+    // Switch to Filament Lamp preset (non-ohmic)
+    fireEvent.click(screen.getByRole('button', { name: /12 V Incandescent Filament Lamp/i }));
+    expect(screen.getByText('Illustrative Non-Ohmic Load')).toBeInTheDocument();
+
+    // Record run in My Notebook
+    fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
+    expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
+  });
+
+  it('renders the interactive Series & Parallel Circuits Lab at /experiments/series-parallel-circuits and switches topologies', async () => {
+    renderAt('/experiments/series-parallel-circuits');
+    expect(await screen.findByText('Series, Parallel & Mixed Resistor Network', {}, { timeout: 5000 })).toBeInTheDocument();
+
+    // Switch to Parallel Bank topology
+    fireEvent.click(screen.getByRole('radio', { name: /Parallel Bank/i }));
+    expect(screen.getByText(/Branch Current, Voltage Drop & Power Distribution/i)).toBeInTheDocument();
+
+    // Record run in My Notebook
+    fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
+    expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
+  });
+
+  it('renders the interactive Kirchhoff’s Laws Lab at /experiments/kirchhoff-laws and verifies negative current reversal preset', async () => {
+    renderAt('/experiments/kirchhoff-laws');
+    expect(await screen.findByText('Two-Loop Kirchhoff Network (KCL & KVL)', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/Interactive two-loop Kirchhoff circuit diagram/i),
+    ).toBeInTheDocument();
+
+    // Switch to Symmetric Twin Sources preset (where I₃ = -0.40 A < 0) and verify Negative Current Detected badge
+    expect(screen.getByText(/KCL Residual:/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Symmetric Twin Sources Sharing R₂/i }));
+    expect(screen.getByText(/Negative Current Detected/i)).toBeInTheDocument();
+
+    // Record run in My Notebook
+    fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
+    expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
+  });
+
+  it('renders the interactive Electrical Power & Heating Lab at /experiments/electrical-power-heating and steps timer', async () => {
+    renderAt('/experiments/electrical-power-heating');
+    expect(await screen.findByText('Electrical Power & Joule Heating Apparatus', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/Interactive electrical power and Joule heating circuit/i),
+    ).toBeInTheDocument();
+
+    // Step timer and record run in My Notebook
+    fireEvent.click(screen.getByRole('button', { name: /Step \(\+5 s\)/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
+    expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
+  });
+
+  it('renders the interactive Capacitors Lab at /experiments/capacitors and switches between connected and isolated modes', async () => {
+    renderAt('/experiments/capacitors');
+    expect(await screen.findByText('Parallel-Plate Capacitor & Dielectric Apparatus', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/Interactive parallel-plate capacitor apparatus/i),
+    ).toBeInTheDocument();
+
+    // Switch to Isolated Plates preset
+    fireEvent.click(screen.getByRole('button', { name: /Isolated Charged Capacitor with Dielectric Inserted/i }));
+    expect(screen.getByText(/Isolated Plates \(Q =/i)).toBeInTheDocument();
+
+    // Record run in My Notebook
+    fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
+    expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
+  });
+
+  it('renders the interactive RC Circuits Lab at /experiments/rc-circuits and jumps to 1τ milestone', async () => {
+    renderAt('/experiments/rc-circuits');
+    expect(await screen.findByText('RC Transient Charging & Discharging Apparatus', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/Interactive RC charging and discharging circuit diagram/i),
+    ).toBeInTheDocument();
+
+    // Jump to t = 1τ (63.2% charged)
+    fireEvent.click(screen.getByRole('button', { name: /t = 1τ/i }));
+    expect(screen.getByText('63.2% Charged')).toBeInTheDocument();
+
+    // Record run in My Notebook
+    fireEvent.click(screen.getByRole('button', { name: /Record run in My Notebook/i }));
+    expect(screen.getByRole('button', { name: /Saved to My Notebook/i })).toBeInTheDocument();
+  });
 });

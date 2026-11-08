@@ -68,7 +68,7 @@ export const CONCEPTS: readonly Concept[] = [
       { symbol: 'R', meaning: 'Resistance', unit: 'Ω' },
     ],
     assumptions: 'Constant temperature; ohmic material.',
-    relatedExperiments: ['ohms-law', 'series-parallel-resistors'],
+    relatedExperiments: ['ohms-law', 'series-parallel-circuits', 'kirchhoff-laws', 'electrical-power-heating'],
   },
   {
     id: 'coulombs-law',

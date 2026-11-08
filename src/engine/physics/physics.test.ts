@@ -2,10 +2,39 @@ import { describe, expect, it } from 'vitest';
 import { rk4Step } from '@/engine/mathematics/integrators';
 import { approxEqual, completeEllipticK } from '@/engine/mathematics/numeric';
 import {
+  capacitorCharge,
   capacitorChargingVoltage,
+  capacitorDischargingVoltage,
+  capacitorEnergyFromCV,
+  capacitorEnergyFromQC,
+  capacitorEnergyFromQV,
+  decodeResistorColorBands,
+  electricalPower,
+  electricalPowerFromIR,
+  electricalPowerFromVR,
+  evaluateCapacitorState,
+  evaluateOhmsLawState,
+  evaluatePowerHeatingState,
+  evaluateRCStateAt,
+  jouleHeatingEnergy,
+  joulesToKilowattHours,
+  kilowattHoursToJoules,
   ohmsLawCurrent,
+  ohmsLawResistance,
+  ohmsLawVoltage,
+  parallelCapacitance,
+  parallelPlateCapacitance,
+  parallelPlateElectricField,
   parallelResistance,
+  rcTimeConstant,
+  seriesCapacitance,
   seriesResistance,
+  simulateRCTrajectory,
+  solveLinearSystem,
+  solveResistorNetwork,
+  solveTwoLoopKirchhoffCircuit,
+  validateKirchhoffParams,
+  validateOhmsLawParams,
 } from '@/engine/physics/electricity';
 import { voltageDividerOutput } from '@/engine/physics/electronics';
 import { levelGroundRange, projectileStateAt, projectileSummary, timeOfFlight } from '@/engine/physics/kinematics';
@@ -875,5 +904,300 @@ describe('physics engine — orbital mechanics', () => {
     });
     expect(extremeTraj.elements.classification).toBe('circular');
     expect(Number.isFinite(extremeTraj.samples[extremeTraj.samples.length - 1].r)).toBe(true);
+  });
+});
+
+describe('physics engine — Phase 3 electricity & circuits', () => {
+  it('evaluates Ohm’s law (V = IR, I = V/R, R = V/I), power identities, non-ohmic conductors, and 4-band EIA color codes', () => {
+    expect(ohmsLawCurrent(12, 6)).toBeCloseTo(2, 12);
+    expect(ohmsLawVoltage(2, 6)).toBeCloseTo(12, 12);
+    expect(ohmsLawResistance(12, 2)).toBeCloseTo(6, 12);
+    expect(electricalPower(12, 2)).toBeCloseTo(24, 12);
+    expect(electricalPowerFromIR(2, 6)).toBeCloseTo(24, 12);
+    expect(electricalPowerFromVR(12, 6)).toBeCloseTo(24, 12);
+
+    const ohmic = evaluateOhmsLawState({ voltage: 9, resistance: 150, conductorMode: 'ohmic' });
+    expect(ohmic.current).toBeCloseTo(0.06, 12);
+    expect(ohmic.effectiveResistance).toBeCloseTo(150, 12);
+    expect(ohmic.power).toBeCloseTo(0.54, 12);
+
+    // Filament lamp: effective resistance increases with voltage due to self-heating
+    const lampLow = evaluateOhmsLawState({ voltage: 2, resistance: 24, conductorMode: 'filament-lamp' });
+    const lampHigh = evaluateOhmsLawState({ voltage: 12, resistance: 24, conductorMode: 'filament-lamp' });
+    expect(lampHigh.effectiveResistance).toBeGreaterThan(lampLow.effectiveResistance);
+    expect(lampHigh.effectiveResistance).toBeGreaterThan(24);
+
+    // Semiconductor diode: zero current under reverse/zero bias, conducts above ~0.7 V knee
+    const diodeZero = evaluateOhmsLawState({ voltage: 0, resistance: 100, conductorMode: 'semiconductor-diode' });
+    const diodeSub = evaluateOhmsLawState({ voltage: 0.3, resistance: 100, conductorMode: 'semiconductor-diode' });
+    const diodeFwd = evaluateOhmsLawState({ voltage: 5.0, resistance: 100, conductorMode: 'semiconductor-diode' });
+    expect(diodeZero.current).toBe(0);
+    expect(diodeSub.current).toBeGreaterThan(0);
+    expect(diodeFwd.current).toBeGreaterThan(diodeSub.current * 10);
+
+    // 4-band EIA resistor color code for 470 Ω (Yellow-Violet-Brown-Gold)
+    const bands470 = decodeResistorColorBands(470);
+    expect(bands470).toHaveLength(4);
+    expect(bands470[0].colorName).toBe('Yellow');
+    expect(bands470[1].colorName).toBe('Violet');
+    expect(bands470[2].colorName).toBe('Brown');
+    expect(bands470[3].colorName).toBe('Gold');
+
+    expect(() => validateOhmsLawParams(12, 0)).toThrow(RangeError);
+    expect(() => validateOhmsLawParams(12, -5)).toThrow(RangeError);
+    expect(() => ohmsLawResistance(10, 0)).toThrow(RangeError);
+  });
+
+  it('solves series, parallel, and mixed resistor networks (2 to 5 resistors) with branch switches and KCL/KVL verification', () => {
+    expect(seriesResistance([100, 200, 300])).toBeCloseTo(600, 12);
+    expect(parallelResistance([60, 30, 20])).toBeCloseTo(10, 12);
+
+    const makeSpecs = (values: number[], closedFlags?: boolean[]) =>
+      values.map((r, i) => ({
+        id: `r${i + 1}`,
+        label: `R${i + 1}`,
+        resistance: r,
+        closed: closedFlags ? (closedFlags[i] ?? true) : true,
+      }));
+
+    // Series network: 3 resistors (10 Ω, 20 Ω, 30 Ω) on 12 V -> R_eq = 60 Ω, I = 0.2 A
+    const seriesNet = solveResistorNetwork({
+      topology: 'series',
+      sourceVoltage: 12,
+      resistors: makeSpecs([10, 20, 30]),
+    });
+    expect(seriesNet.equivalentResistance).toBeCloseTo(60, 12);
+    expect(seriesNet.totalCurrent).toBeCloseTo(0.2, 12);
+    expect(seriesNet.branches.map((b) => b.voltageDrop)).toEqual([2, 4, 6]);
+    expect(seriesNet.kclResidual).toBeLessThan(1e-12);
+    expect(seriesNet.kvlResidual).toBeLessThan(1e-12);
+
+    // Opening a single switch in a series chain interrupts the entire circuit
+    const openSeries = solveResistorNetwork({
+      topology: 'series',
+      sourceVoltage: 12,
+      resistors: makeSpecs([10, 20, 30], [true, false, true]),
+    });
+    expect(openSeries.isCircuitComplete).toBe(false);
+    expect(openSeries.equivalentResistance).toBe(Number.POSITIVE_INFINITY);
+    expect(openSeries.totalCurrent).toBe(0);
+
+    // Parallel network: 4 resistors with one branch switched open
+    const parallelNet = solveResistorNetwork({
+      topology: 'parallel',
+      sourceVoltage: 12,
+      resistors: makeSpecs([12, 24, 24, 50], [true, true, true, false]),
+    });
+    expect(parallelNet.equivalentResistance).toBeCloseTo(6, 12);
+    expect(parallelNet.totalCurrent).toBeCloseTo(2, 12);
+    expect(parallelNet.branches[3].current).toBe(0);
+    expect(parallelNet.kclResidual).toBeLessThan(1e-12);
+    expect(parallelNet.kvlResidual).toBeLessThan(1e-12);
+
+    // Mixed series-parallel: R1 = 10 Ω in series with (R2 = 20 Ω || R3 = 20 Ω) -> R_eq = 20 Ω
+    const mixedSP = solveResistorNetwork({
+      topology: 'mixed-series-parallel',
+      sourceVoltage: 20,
+      resistors: makeSpecs([10, 20, 20]),
+    });
+    expect(mixedSP.equivalentResistance).toBeCloseTo(20, 12);
+    expect(mixedSP.totalCurrent).toBeCloseTo(1.0, 12);
+    expect(mixedSP.branches[0].voltageDrop).toBeCloseTo(10, 12);
+    expect(mixedSP.branches[1].voltageDrop).toBeCloseTo(10, 12);
+    expect(mixedSP.branches[1].current).toBeCloseTo(0.5, 12);
+
+    // Mixed dual-parallel: (R1 = 20 Ω || R2 = 20 Ω) in series with (R3 = 30 Ω || R4 = 60 Ω || R5 = 20 Ω)
+    // Group A = 10 Ω, Group B = 1 / (1/30 + 1/60 + 1/20) = 10 Ω -> R_eq = 20 Ω
+    const mixedDual = solveResistorNetwork({
+      topology: 'mixed-dual-parallel',
+      sourceVoltage: 40,
+      resistors: makeSpecs([20, 20, 30, 60, 20]),
+    });
+    expect(mixedDual.equivalentResistance).toBeCloseTo(20, 12);
+    expect(mixedDual.totalCurrent).toBeCloseTo(2.0, 12);
+    expect(mixedDual.kclResidual).toBeLessThan(1e-12);
+    expect(mixedDual.kvlResidual).toBeLessThan(1e-12);
+  });
+
+  it('solves linear systems with partial pivoting, detects singular matrices, and solves two-loop Kirchhoff networks', () => {
+    const uniqueSys = solveLinearSystem(
+      [
+        [2, 1, -1],
+        [-3, -1, 2],
+        [-2, 1, 2],
+      ],
+      [8, -11, -3],
+    );
+    expect(uniqueSys.status).toBe('unique');
+    expect(uniqueSys.solution[0]).toBeCloseTo(2, 10);
+    expect(uniqueSys.solution[1]).toBeCloseTo(3, 10);
+    expect(uniqueSys.solution[2]).toBeCloseTo(-1, 10);
+    expect(uniqueSys.residualNorm).toBeLessThan(1e-12);
+
+    // Singular system
+    const singularSys = solveLinearSystem(
+      [
+        [1, 2, 3],
+        [2, 4, 6],
+        [1, 1, 1],
+      ],
+      [6, 12, 3],
+    );
+    expect(singularSys.status).toBe('singular');
+    expect(singularSys.solution).toEqual([]);
+
+    // Two-loop Kirchhoff network: verify CW and CCW loop traversal directions produce identical physical currents
+    const kCw = solveTwoLoopKirchhoffCircuit({
+      e1: 12,
+      e2: 0,
+      e3: 6,
+      r1: 4,
+      r2: 6,
+      r3: 3,
+      loop1Direction: 'clockwise',
+      loop2Direction: 'clockwise',
+    });
+    const kCcw = solveTwoLoopKirchhoffCircuit({
+      e1: 12,
+      e2: 0,
+      e3: 6,
+      r1: 4,
+      r2: 6,
+      r3: 3,
+      loop1Direction: 'counter-clockwise',
+      loop2Direction: 'counter-clockwise',
+    });
+    expect(kCw.solverStatus).toBe('unique');
+    expect(kCw.i1).toBeCloseTo(kCcw.i1, 12);
+    expect(kCw.i2).toBeCloseTo(kCcw.i2, 12);
+    expect(kCw.i3).toBeCloseTo(kCcw.i3, 12);
+    expect(kCw.kclResidual).toBeLessThan(1e-12);
+    expect(kCw.kvlLoop1Residual).toBeLessThan(1e-12);
+    expect(kCw.kvlLoop2Residual).toBeLessThan(1e-12);
+    expect(kCw.kvlOuterLoopResidual).toBeLessThan(1e-12);
+
+    // Negative current reversal check: strong right source E3 = 24 V forces I1 < 0 and I3 < 0
+    const kRev = solveTwoLoopKirchhoffCircuit({
+      e1: 4,
+      e2: 0,
+      e3: 24,
+      r1: 5,
+      r2: 10,
+      r3: 2,
+    });
+    expect(kRev.i1).toBeLessThan(0);
+    expect(kRev.i3).toBeLessThan(0);
+    expect(kRev.branches[0].isReversedFromAssumed).toBe(true);
+    expect(kRev.branches[2].isReversedFromAssumed).toBe(true);
+
+    expect(() =>
+      validateKirchhoffParams({ e1: 10, e3: 5, r1: 0, r2: 10, r3: 10 }),
+    ).toThrow(RangeError);
+  });
+
+  it('evaluates electrical power, Joule heating energy, kWh conversions, and illustrative lumped thermal response', () => {
+    // I = 2 A through R = 15 Ω for t = 600 s -> P = 60 W, H = 36,000 J = 0.01 kWh
+    expect(jouleHeatingEnergy(2, 15, 600)).toBeCloseTo(36_000, 9);
+    expect(joulesToKilowattHours(3_600_000)).toBeCloseTo(1, 12);
+    expect(kilowattHoursToJoules(0.5)).toBeCloseTo(1_800_000, 9);
+
+    const state0 = evaluatePowerHeatingState({ voltage: 30, resistance: 15, ambientTempC: 22 }, 0);
+    const state600 = evaluatePowerHeatingState({ voltage: 30, resistance: 15, ambientTempC: 22 }, 600);
+    expect(state600.current).toBeCloseTo(2, 12);
+    expect(state600.powerWatts).toBeCloseTo(60, 12);
+    expect(state600.energyJoules).toBeCloseTo(36_000, 9);
+    expect(state600.energyKWh).toBeCloseTo(0.01, 12);
+    expect(state0.illustrativeTempC).toBeCloseTo(22, 12);
+    expect(state600.illustrativeTempC).toBeCloseTo(state600.illustrativeSteadyStateTempC, 3);
+  });
+
+  it('evaluates parallel-plate capacitance, electrostatic energy identities, series/parallel banks, and connected vs isolated dielectric insertion', () => {
+    const area = 0.02; // 200 cm²
+    const d = 0.001; // 1 mm
+    const cVac = parallelPlateCapacitance(area, d, 1);
+    const cDiel = parallelPlateCapacitance(area, d, 4);
+    expect(cDiel).toBeCloseTo(4 * cVac, 15);
+
+    const q = capacitorCharge(cDiel, 100);
+    const eField = parallelPlateElectricField(100, d);
+    expect(eField).toBeCloseTo(100_000, 9);
+
+    const uCV = capacitorEnergyFromCV(cDiel, 100);
+    const uQC = capacitorEnergyFromQC(q, cDiel);
+    const uQV = capacitorEnergyFromQV(q, 100);
+    expect(uCV).toBeCloseTo(uQC, 15);
+    expect(uCV).toBeCloseTo(uQV, 15);
+
+    // Series and parallel capacitor combinations
+    expect(seriesCapacitance([6e-6, 3e-6])).toBeCloseTo(2e-6, 15);
+    expect(parallelCapacitance([6e-6, 3e-6])).toBeCloseTo(9e-6, 15);
+
+    // Connected mode (constant V): inserting ε_r = 4 quadruples C, Q, and U while V and E stay constant
+    const connVac = evaluateCapacitorState({
+      plateAreaM2: area,
+      separationM: d,
+      dielectricConstant: 1,
+      supplyVoltage: 50,
+      connectionMode: 'connected',
+    });
+    const connDiel = evaluateCapacitorState({
+      plateAreaM2: area,
+      separationM: d,
+      dielectricConstant: 4,
+      supplyVoltage: 50,
+      connectionMode: 'connected',
+    });
+    expect(connDiel.voltage).toBeCloseTo(connVac.voltage, 12);
+    expect(connDiel.charge).toBeCloseTo(4 * connVac.charge, 15);
+    expect(connDiel.storedEnergy).toBeCloseTo(4 * connVac.storedEnergy, 15);
+
+    // Isolated mode (constant Q): inserting ε_r = 4 with locked charge Q₀ quarters V, E, and U
+    const isoDiel = evaluateCapacitorState({
+      plateAreaM2: area,
+      separationM: d,
+      dielectricConstant: 4,
+      supplyVoltage: 50,
+      connectionMode: 'isolated',
+      lockedChargeCoulombs: connVac.charge,
+    });
+    expect(isoDiel.charge).toBeCloseTo(connVac.charge, 15);
+    expect(isoDiel.voltage).toBeCloseTo(connVac.voltage / 4, 12);
+    expect(isoDiel.electricField).toBeCloseTo(connVac.electricField / 4, 9);
+    expect(isoDiel.storedEnergy).toBeCloseTo(connVac.storedEnergy / 4, 15);
+  });
+
+  it('evaluates RC charging and discharging transients at t = 0, τ, and 5τ and verifies KVL conservation', () => {
+    const R = 2000; // 2 kΩ
+    const C = 500e-6; // 500 µF -> τ = 1.0 s
+    const V0 = 10;
+    const tau = rcTimeConstant(R, C);
+    expect(tau).toBeCloseTo(1.0, 12);
+
+    // Charging at t = 0, t = τ, t = 5τ
+    const chg0 = evaluateRCStateAt({ voltage: V0, resistance: R, capacitance: C, mode: 'charging' }, 0);
+    const chgTau = evaluateRCStateAt({ voltage: V0, resistance: R, capacitance: C, mode: 'charging' }, tau);
+    const chg5Tau = evaluateRCStateAt({ voltage: V0, resistance: R, capacitance: C, mode: 'charging' }, 5 * tau);
+
+    expect(chg0.capacitorVoltage).toBe(0);
+    expect(chg0.resistorVoltage).toBeCloseTo(V0, 12);
+    expect(chg0.current).toBeCloseTo(V0 / R, 12);
+
+    expect(chgTau.capacitorVoltage).toBeCloseTo(V0 * (1 - Math.exp(-1)), 12);
+    expect(chgTau.percentCharged).toBeCloseTo(63.212, 2);
+    expect(chgTau.capacitorVoltage + chgTau.resistorVoltage).toBeCloseTo(V0, 12);
+
+    expect(chg5Tau.percentCharged).toBeGreaterThan(99.3);
+
+    // Discharging at t = τ
+    const disTau = evaluateRCStateAt({ voltage: V0, resistance: R, capacitance: C, mode: 'discharging' }, tau);
+    expect(disTau.capacitorVoltage).toBeCloseTo(capacitorDischargingVoltage(V0, R, C, tau), 12);
+    expect(disTau.percentCharged).toBeCloseTo(36.788, 2);
+    expect(disTau.current).toBeLessThan(0);
+    expect(disTau.capacitorVoltage + disTau.resistorVoltage).toBeCloseTo(0, 12);
+
+    const traj = simulateRCTrajectory({ voltage: V0, resistance: R, capacitance: C, mode: 'charging' });
+    expect(traj.length).toBeGreaterThan(50);
+    expect(traj[0].t).toBe(0);
+    expect(traj[traj.length - 1].t).toBeCloseTo(5 * tau, 12);
   });
 });

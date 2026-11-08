@@ -33,6 +33,12 @@ describe('experiment registry & search', () => {
       'inclined-plane-friction',
       'collisions-momentum',
       'orbital-motion',
+      'ohms-law',
+      'series-parallel-circuits',
+      'kirchhoff-laws',
+      'electrical-power-heating',
+      'capacitors',
+      'rc-circuits',
     ]);
     expect(available.length + planned.length).toBe(EXPERIMENTS.length);
     expect(getExperiment('projectile-motion')?.status).toBe('available');
@@ -41,6 +47,14 @@ describe('experiment registry & search', () => {
     expect(getExperiment('inclined-plane-friction')?.status).toBe('available');
     expect(getExperiment('collisions-momentum')?.status).toBe('available');
     expect(getExperiment('orbital-motion')?.status).toBe('available');
+    expect(getExperiment('ohms-law')?.status).toBe('available');
+    expect(getExperiment('series-parallel-circuits')?.status).toBe('available');
+    expect(getExperiment('kirchhoff-laws')?.status).toBe('available');
+    expect(getExperiment('electrical-power-heating')?.status).toBe('available');
+    expect(getExperiment('capacitors')?.status).toBe('available');
+    expect(getExperiment('rc-circuits')?.status).toBe('available');
+    expect(getExperiment('series-parallel-resistors')?.slug).toBe('series-parallel-circuits');
+    expect(getExperiment('rc-circuit')?.slug).toBe('rc-circuits');
     expect(queryExperiments({ text: 'snell optics' }).map((e) => e.slug)).toContain('refraction-snells-law');
   });
 

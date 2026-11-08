@@ -30,8 +30,14 @@ export const EXPERIMENTS: readonly ExperimentDefinition[] = [
 
 const BY_SLUG = new Map(EXPERIMENTS.map((e) => [e.slug, e]));
 
+const LEGACY_SLUG_ALIASES: Record<string, string> = {
+  'series-parallel-resistors': 'series-parallel-circuits',
+  'rc-circuit': 'rc-circuits',
+};
+
 export function getExperiment(slug: string | undefined): ExperimentDefinition | undefined {
-  return slug ? BY_SLUG.get(slug) : undefined;
+  if (!slug) return undefined;
+  return BY_SLUG.get(slug) ?? BY_SLUG.get(LEGACY_SLUG_ALIASES[slug] ?? '');
 }
 
 export function getExperimentsByCategory(category: CategoryId): ExperimentDefinition[] {
